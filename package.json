@@ -1,0 +1,26 @@
+{
+  "name": "scrapingweb",
+  "version": "1.0.0",
+  "description": "untuk scraping web sesuai yang di inginkan",
+  "main": "index.js",
+  "dependencies": {
+    "cheerio": "latest",
+    "dateformat": "^3.0.2",
+    "express": "latest",
+    "lodash": "^4.17.4",
+    "lowdb": "^1.0.0",
+    "md5": "^2.2.1",
+    "mysql": "^2.15.0",
+    "request": "latest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "github"
+  },
+  "keywords": [
+    "scraping",
+    "web"
+  ],
+  "author": "Bandit Coding",
+  "license": "ISC"
+}
