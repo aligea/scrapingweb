@@ -5,20 +5,14 @@ var cheerio = require('cheerio');
 var fs = require('fs');
 var md5 = require('md5');
 var dateFormat = require('dateformat');
-
-var fn = require('./global-functions.js');
-var cleanString = fn.cleanString;
-var validateRecord = fn.validateRecord;
-var downloadImage = fn.downloadImage;
-
 var _ = require('lodash');
 var fn = require('./global-functions.js');
 var config = fn.config;
 var queue = global.queue;
 
-var scrapsources = config.source_url.tribunmedan;
-var listpage = scrapsources.data;
-
+var scrapsources = config.source_url.jalantikus;
+var listpage = config.source_url.jalantikus.data;
+//var async = require('async')
 function init() {
    _.forEach(scrapsources.data, function (value) {
       queue.add(function () {
@@ -30,6 +24,7 @@ function init() {
             });
          });
       });
+
    });
 
    _.forEach(scrapsources.page, function (value) {
@@ -48,86 +43,84 @@ function extractPage(url, label, callback) {
             reject(errMsg);
             return;
          }
-         _html = cleanString(_html);
+         _html = fn.cleanString(_html);
          var html = _html.toString().replace('</html>', '') + '</html>';
          var $ch = cheerio.load(html);
          var content = {};
 
-         var amphtml = fn.getStringBetween(_html, '<link rel="amphtml" href="', '" data-component-name="amp:html:link">');
-
-         if (amphtml && amphtml !== '') {
-            callback = fn.getStringBetween(html, '<meta name="news_keywords" content="', '" />');
-            return extractPage(amphtml, label, callback);
-         }
-         /*		
-          fs.writeFile("./test.html", html, function (err) {
-          if (err) {
-          return console.log(err);
-          }
-          console.log("The file was saved!");
-          }); 
-          */
-
-         var schemastring = fn.getStringBetween(html, '<script type="application/ld+json">', '</script>');
-         var schemaobject = (function (schemastring) {
-            try {
-               return JSON.parse(schemastring);
-            } catch (e) {
-               return false;
-            }
-         })(schemastring);
-         if (!schemaobject) {
-            return console.log('*** error json - ' + response.request.href);
-         }
+         //fs.writeFile("./test.html", html);
+         //return;
 
          var publishdate = (function () {
-            var output = dateFormat(new Date(schemaobject.datePublished), "yyyy-mm-dd HH:MM:ss");
+            var tag = $ch('.property').find('.timestamp');
+            var randomHourMinute = new Date().getHours() + ':' + _.random(10, 59);
+            var pubdate = $ch(tag[0]).text();
 
-            return output;
+            try {
+               var output = dateFormat(new Date(pubdate), "yyyy-mm-dd");
+               output = output + ' ' + randomHourMinute + ':00';
+               return output;
+            } catch (e) {
+               return dateFormat(new Date(), "yyyy-mm-dd HH:MM:ss");
+            }
+
          })();
-         var imagedir = ('tbm/') + (publishdate.toString().substr(0, 10));
+         var imagedir = ('jlt/') + (publishdate.toString().substr(0, 10));
          var fulltext = (function (imagedir) {
-            var tag = $ch('.article-body')[0];
-            var output = $ch(tag).html();
-            var adcont = (function () {
-               var a = $ch('.ad-container').parent();
-               var b = $ch.html(a[0]);
-               return b;
-            })();
-            output = output.replace(new RegExp('<amp-img', 'g'), '<img');
-            output = output.replace(new RegExp('></amp-img>', 'g'), ' />');
-            output = output.replace(adcont, '');
-            //fs.writeFile("./test.html", output);
+            var tag = $ch('.entry-content');
+            tag.contents().filter(function () {
+               return this.type === 'comment';
+            }).remove();
+            tag.find('.partner-banner-aftc-artikel-menarik').remove();
+            tag.find('.bacajuga').remove();
+            tag.find('.artikelmenarik').remove();
+            tag.find('script').remove();
+            tag.find('style').remove();
+            tag.find('.appsinner').remove();
+            tag.find('.emoji-container').remove();
+            tag.find('.partner-banner-aftc-wrapper').remove();
+            tag.find('.partner-banner-aftc-baca-juga').remove();
+            tag.find('.anchor-read').remove();
+            tag.find('.partner-inline-article-desktop').remove();
+            tag.find('.partner-inline-article-mobile').remove();
 
-            var $imgtag = $ch('.article-body img');
+            var output = $ch(tag).html();
+
+            var $imgtag = $ch(tag).find('img');
             for (var i = 0; i < $imgtag.length; i++) {
                var item = $imgtag[i];
                var imageurl = item.attribs.src;
-               var newimgsrc = downloadImage(imageurl, imagedir);
+               var newimgsrc = fn.downloadImage(imageurl, imagedir);
 
                output = output.replace(imageurl, newimgsrc);
             }
             return output;
          })(imagedir);
-
-         var imageurl = schemaobject.image.url;
+         var imageurl = (function () {
+            var output = '';
+            var tag = $ch('.content-primary .cover-image-container img');
+            if (tag.length > 0) {
+               output = tag[0].attribs.src;
+            }
+            return output;
+         })();
 
          content.type = 'news';
-         content.title = schemaobject.headline;
-         content.introtext = schemaobject.description;
+         content.title = $ch('.info h1').text();
+         content.introtext = fn.getStringBetween(html, '<meta name="description" content="', '">');
          content.fulltext = fulltext;
          content.created = dateFormat(new Date(), "yyyy-mm-dd HH:MM:ss");
          content.modified = content.created;
          content.publish_up = publishdate;
-         content.images = downloadImage(imageurl, imagedir);
-         content.metakey = callback;
+         content.images = fn.downloadImage(imageurl, imagedir);
+         content.metakey = fn.getStringBetween(html, '<meta name="keywords" content="', '">');
          content.metadesc = content.introtext;
          content.alias = md5(url);
          content.source = url;
-         content.xreference = 'tribunmedan';
+         content.xreference = 'jalantikus';
          content.tagdata = (function () {
             var output = '';
-            var tag = $ch('.tagcload3 a');
+            var tag = $ch('.property category a');
             var temp = [];
             for (var i = 0; i < tag.length; i++) {
                var elm = tag[i];
@@ -137,7 +130,16 @@ function extractPage(url, label, callback) {
             output = temp.join(', ');
             return output;
          })();
-         content.label = label;
+         content.label = (function () {
+            var kanal = fn.getStringBetween(html, '<meta property="section" content="', '"/>');
+
+            if (kanal === 'teknologi') {
+               return 'tekno';
+            }
+
+            return label;
+         })();
+         content.urls = imageurl;
 
          fn.insertContent(content, function () {
             console.log(new Date().toLocaleString() + ' *** success [insertContent] : ' + response.request.href);
@@ -147,8 +149,8 @@ function extractPage(url, label, callback) {
          });
          console.log(new Date().toLocaleString() + ' *** success [extractPage] : ' + response.request.href);
          resolve(content);
-
       };
+
       fn.checkRecord(md5(url)).then(function (res) {
          //console.log('im here', res);
          if (res) {
@@ -160,10 +162,8 @@ function extractPage(url, label, callback) {
          reject('error validation');
       });
    });
-
    return thePromise;
 }
-
 function scrapeListingPage(url) {
    var thePromise = new Promise(function (resolve, reject) {
       function onRequesting(error, response, _html) {
@@ -173,16 +173,12 @@ function scrapeListingPage(url) {
             reject(error);
             return;
          }
-         _html = cleanString(response.body);
+         _html = fn.cleanString(response.body);
          var html = _html.toString().replace('</html>', '') + '</html>';
          var $ = cheerio.load(html);
 
-//      fs.writeFile("./test.html", html, function (err) {
-//         if (err) {
-//            return console.log(err);
-//         }
-//         console.log("The file was saved!");
-//      });
+         //fs.writeFile("./test.html", html);
+         //return;
 
          var label = (function () {
             for (var i = 0; i < listpage.length; i++) {
@@ -194,66 +190,45 @@ function scrapeListingPage(url) {
             }
             return 'berita';
          })();
-         var delay = 5000;
          var tempUrl = [];
 
          var itemToScrape = [];
 
-         //-- berita di slideshow
-         var items = $('#slideshow .pos_abs a');
+         //-- berita di listing search, cth : https://jalantikus.com/search/keyword/programmer
+         var items = $('.content-description .article-detail.stretch a.click-target');
          for (var i = 0; i < items.length; i++) {
-            if (items[i].attribs.href.indexOf('/topic/') >= 0) {
-               continue;
-            }
             tempUrl.push(items[i].attribs.href);
          }
+
+         //-- berita di listing search, cth : https://jalantikus.com/news/
+         var items = $('.content-list .article-detail a.click-target');
+         for (var i = 0; i < items.length; i++) {
+            tempUrl.push(items[i].attribs.href);
+         }
+
          //-- filter duplikasi 
          tempUrl = tempUrl.filter(function (elem, index, self) {
             return index === self.indexOf(elem);
          });
+
+         //-- binding-transfrom data
          for (var idx in tempUrl) {
-            itemToScrape.push({
-               url: tempUrl[idx],
-               label: 'berita'
-            });
-         }
-
-
-         //-- berita terakhir
-         var items = $('#latestul .art-list.pos_rel');
-         //var delay = 5000;
-         for (var i = 0; i < items.length; i++) {
-            var elm = $(items[i]).find('.fbo2.tsa-2');
-            var a = $(items[i]).find('h3 a');
-            var kanal = elm.text();
-            var xlabel = label;
-
-            if (kanal === '' || !a[0]) {
-               continue;
-            }
-
-            if (kanal === 'Seleb') {
-               xlabel = 'seleb';
-            }
-            if (kanal === 'Techno') {
-               xlabel = 'tekno';
-            }
-
+            var xurl = tempUrl[idx];
 
             itemToScrape.push({
-               url: a[0].attribs.href,
-               label: xlabel
+               url: xurl,
+               label: label
             });
-
          }
 
          console.log(new Date().toLocaleString() + ' *** success [scrapeListingPage] : ' + response.request.href);
          resolve(itemToScrape);
       }
-
       request(url, onRequesting);
    });
+
    return thePromise;
 }
 
 module.exports = {doProcess: init, scrapeListingPage};
+

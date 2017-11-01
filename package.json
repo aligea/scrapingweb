@@ -4,6 +4,7 @@
   "description": "untuk scraping web sesuai yang di inginkan",
   "main": "index.js",
   "dependencies": {
+    "async": "^2.5.0",
     "cheerio": "latest",
     "dateformat": "^3.0.2",
     "express": "latest",
@@ -11,6 +12,7 @@
     "lowdb": "^1.0.0",
     "md5": "^2.2.1",
     "mysql": "^2.15.0",
+    "p-queue": "^2.2.0",
     "request": "latest"
   },
   "repository": {

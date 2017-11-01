@@ -2,7 +2,7 @@
 
 var config = require('../config.js');
 var request = require('request');
-var cheerio = require('cheerio');
+//var cheerio = require('cheerio');
 var fs = require('fs');
 var md5 = require('md5');
 var dateFormat = require('dateformat');
@@ -15,8 +15,56 @@ var fn = {
    namabulankeangka: namabulankeangka,
    getStringBetween: getStringBetween,
    insertContent: insertContent,
-   downloadImage: downloadImage
+   downloadImage: downloadImage,
+
+   /**
+    * config variable from config.js
+    */
+   config: config,
+
+   /**
+    * Check row di tb_content berdasarkan kolom alias
+    * @param {string} alias
+    * @param {function} callback success
+    * @returns {Promise}
+    */
+   checkRecord: function (alias, callback) {
+      var thePromise = new Promise(function (resolve, reject) {
+         pool.getConnection(function (err, connection) {
+            if (err) {
+               reject(err);
+               console.log('*** mysql connection error');
+               return;
+            }
+            var sql = 'SELECT id FROM tb_content WHERE alias="' + alias + '" LIMIT 1';
+            connection.query(sql, function (error, results, fields) {
+               connection.release();
+               if (error) {
+                  console.log('*** mysql query error : ' + error.sqlMessage);
+                  reject(error.sqlMessage);
+                  return;
+               }
+
+               var row = results[0];
+               if (row && Number(row['id']) > 0) {
+                  //console.log('sudah ada');
+                  //reject('sudah ada');
+                  resolve(false);
+               } else {
+                  if (typeof callback === 'function') {
+                     callback(results, fields);
+                  }
+                  //console.log('aku disini');
+                  resolve(true);
+               }
+               
+            });
+         });
+      });
+      return thePromise;
+   }
 };
+
 function randonAlphaNumeric(strlen) {
    var text = "";
    var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -29,11 +77,15 @@ function randonAlphaNumeric(strlen) {
 }
 function validateRecord(alias, callback) {
    pool.getConnection(function (err, connection) {
+      if (err) {
+         console.log('*** mysql connection error : ' + err.sqlMessage);
+         return;
+      }
       var sql = 'SELECT id FROM tb_content WHERE alias="' + alias + '" LIMIT 1';
       connection.query(sql, function (error, results, fields) {
          connection.release();
          if (error) {
-            console.log(error.sqlMessage);
+            console.log('*** mysql query error : ' + error.sqlMessage);
             return;
          }
 
@@ -82,6 +134,13 @@ function getStringBetween(teks, sebelum, sesudah) {
    var panjang = ($text.indexOf(sesudah, $ini)) - $ini;
    return $text.substr($ini, panjang);
 }
+
+/**
+ * Insert tb_content row mysql
+ * @param {object} obj row of mysql tb_content
+ * @param {function} callback fires when mysql query success
+ * @returns {undefined}
+ */
 function insertContent(obj, callback) {
    if (!obj) {
       console.log('no obj');
@@ -89,11 +148,16 @@ function insertContent(obj, callback) {
    }
 
    pool.getConnection(function (err, connection) {
+      if (err) {
+         console.log('*** [insertContent] connection error : ' + err.sqlMessage);
+         return;
+      }
       var sql = 'INSERT INTO tb_content SET ?';
       connection.query(sql, obj, function (error, results, fields) {
          connection.release();
          if (error) {
-            console.log(error.sqlMessage);
+            console.log('*** [insertContent] fail : ' + error.sqlMessage);
+            console.log('*** source : ' + obj.source);
             return;
          }
 
@@ -108,14 +172,14 @@ function downloadImage(image_url, directory, callback) {
       return '@prefix/default.jpg';
    }
    var filename = '';
-
+   callback = (typeof callback === 'function') ? callback : function () {};
    //-- fix bug kadang ada string diawali //
-   if(image_url.toString().indexOf('//') === 0){
+   if (image_url.toString().indexOf('//') === 0) {
       image_url = image_url.toString().replace("//", '');
    }
-   
+
    //-- jika gambar gif  jangan di download
-   if(image_url.toLowerCase().indexOf('.gif') >= 0){
+   if (image_url.toLowerCase().indexOf('.gif') >= 0) {
       console.log(image_url);
       return image_url;
    }
@@ -153,25 +217,23 @@ function downloadImage(image_url, directory, callback) {
 
    //-- check jika gambar sudah ada maka gak usah lagi download
    if (fs.existsSync(filepath)) {
+      callback(output, 'file exist');
       //console.log('*** file exist ' + filepath);
       return output;
    }
-	
-   request.head(image_url, function (err, res, body) {
-		if(err){
-			console.log('*** error image : ' + image_url);
-			return;
-		}
-		request(image_url).pipe(fs.createWriteStream(filepath)).on('close', function () {
-			if (typeof callback === 'function') {
-				callback(output);
-			}
-		});
-	});
-   
 
+   request.get(image_url, function (err, res, body) {
+      if (err) {
+         console.log('*** error image : ' + image_url);
+         return;
+      }
+      request(image_url).pipe(fs.createWriteStream(filepath)).on('close', function () {
+         if (typeof callback === 'function') {
+            callback(output, 'file just added');
+         }
+      });
+   });
    return output;
 }
-
 
 module.exports = fn;
