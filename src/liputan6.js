@@ -42,7 +42,7 @@ function extractPage(url, label, callback) {
    var thePromise = new Promise(function (resolve, reject) {
       var onRequesting = function (error, response, _html) {
          if (error) {
-            var errMsg = '*** error [extractPage] : ' + response.request.href;
+            var errMsg = '*** error [extractPage] : ' + error;
             console.log(errMsg);
             reject(errMsg);
             return;
