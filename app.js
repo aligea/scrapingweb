@@ -143,7 +143,7 @@ server.listen('8080', function () {
    onServerReady();
    queue.addListener(function () {
       setTimeout(function () {
-         console.info(new Date.toLocaleString() +  '===== start again =====');
+         console.info(new Date().toLocaleString() +  '===== start again =====');
          onServerReady();
       }, 1 * (60000));
    });
