@@ -146,6 +146,11 @@ function insertContent(obj, callback) {
       console.log('no obj');
       return;
    }
+   var pubdate = Date.parse(obj.publish_up);
+   var $now = new Date().getTime();
+   if(pubdate > $now){
+      return callback();
+   }
 
    pool.getConnection(function (err, connection) {
       if (err) {
