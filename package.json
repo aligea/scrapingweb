@@ -1,28 +1,33 @@
 {
-  "name": "scrapingweb",
-  "version": "1.0.0",
-  "description": "untuk scraping web sesuai yang di inginkan",
-  "main": "index.js",
-  "dependencies": {
-    "async": "^2.5.0",
-    "cheerio": "latest",
-    "dateformat": "^3.0.2",
-    "express": "latest",
-    "lodash": "^4.17.4",
-    "lowdb": "^1.0.0",
-    "md5": "^2.2.1",
-    "mysql": "^2.15.0",
-    "p-queue": "^2.2.0",
-    "request": "latest"
-  },
-  "repository": {
-    "type": "git",
-    "url": "github"
-  },
-  "keywords": [
-    "scraping",
-    "web"
-  ],
-  "author": "Bandit Coding",
-  "license": "ISC"
+    "name": "scrapingweb",
+    "version": "1.0.0",
+    "description": "untuk scraping web sesuai yang di inginkan",
+    "main": "index.js",
+    "dependencies": {
+        "async": "^2.5.0",
+        "cheerio": "latest",
+        "dateformat": "^3.0.2",
+        "express": "latest",
+        "google-translate-api-browser": "latest",
+        "lodash": "^4.17.4",
+        "lowdb": "^1.0.0",
+        "md5": "^2.2.1",
+        "mysql": "^2.15.0",
+        "p-queue": "^2.2.0",
+        "request": "latest",
+        "translate-google": "^1.5.0"
+    },
+    "repository": {
+        "type": "git",
+        "url": "github"
+    },
+    "keywords": [
+        "scraping",
+        "web"
+    ],
+    "author": "Bandit Coding",
+    "license": "ISC",
+    "scripts": {
+        "start": "node app.js"
+    }
 }

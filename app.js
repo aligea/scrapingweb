@@ -126,7 +126,8 @@ var queue = (function () {
 global.queue = queue;
 
 function onServerReady() {
-   _.forEach(config.source_url, function (value, key) {
+   /*
+    _.forEach(config.source_url, function (value, key) {
       let srcfile = './src/' + key;
       if (!value.data) {
          return;
@@ -135,7 +136,12 @@ function onServerReady() {
       var mod = require(srcfile);
 
       mod.doProcess();
+      //console.log(mod);
    });
+    */
+   var targetWebsite = require('./src/jalantikus.js');
+   targetWebsite.doProcess();
+   //console.log(config.source_url.merdeka);
 }
 
 server.listen('8080', function () {
@@ -147,7 +153,7 @@ server.listen('8080', function () {
          onServerReady();
       }, 1 * (60000));
    });
-   console.log = function(){};
+   //console.log = function(){};
 });
 process.on('unhandledRejection', (reason, p) => {
    console.log('Unhandled Rejection at: Promise', p, 'reason:', reason);

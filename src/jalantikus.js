@@ -1,234 +1,267 @@
 /* global __filename */
 
-var request = require('request');
-var cheerio = require('cheerio');
-var fs = require('fs');
-var md5 = require('md5');
-var dateFormat = require('dateformat');
-var _ = require('lodash');
-var fn = require('./global-functions.js');
+var request = require("request");
+var cheerio = require("cheerio");
+var fs = require("node:fs");
+var md5 = require("md5");
+var dateFormat = require("dateformat");
+
+var fn = require("./global-functions.js");
+var cleanString = fn.cleanString;
+var downloadImage = fn.downloadImage;
+
+var _ = require("lodash");
+var fn = require("./global-functions.js");
 var config = fn.config;
 var queue = global.queue;
 
 var scrapsources = config.source_url.jalantikus;
-var listpage = config.source_url.jalantikus.data;
-//var async = require('async')
+var listpage = scrapsources.data;
+
+const { translate } = require("google-translate-api-browser");
+const translate2 = require("translate-google");
+
+var title_attr = "";
+var content_attr = "";
+
+function send_content(contentobj) {
+  // Import the http module
+  const http = require("http");
+
+  // Create an options object
+  const options = {
+    hostname: "jsonplaceholder.typicode.com",
+    port: 80,
+    path: "/posts",
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "User-Agent": "Node.js",
+    },
+  };
+
+  // Create a data object
+  const data = {
+    title: "Hello, world!",
+    body: "This is a test post",
+    userId: 1,
+  };
+
+  // Stringify the data object
+  const dataString = JSON.stringify(data);
+
+  // Update the options object with the data length
+  options.headers["Content-Length"] = dataString.length;
+
+  // Create a request object
+  const request = http.request(options, (response) => {
+    // Initialize a variable to store the response data
+    let data = "";
+
+    // Listen to the data event
+    response.on("data", (chunk) => {
+      // Append the chunk to the data variable
+      data += chunk.toString();
+    });
+
+    // Listen to the end event
+    response.on("end", () => {
+      // Log the status code and the headers
+      console.log(`Status code: ${response.statusCode}`);
+      console.log(`Headers: ${JSON.stringify(response.headers)}`);
+
+      // Parse the data as JSON
+      const post = JSON.parse(data);
+
+      // Log the post information
+      console.log(`Post ID: ${post.id}`);
+      console.log(`Post Title: ${post.title}`);
+      console.log(`Post Body: ${post.body}`);
+      console.log(`Post User ID: ${post.userId}`);
+    });
+
+    // Listen to the error event
+    response.on("error", (error) => {
+      // Throw the error
+      throw error;
+    });
+  });
+
+  // Write the data to the request object
+  request.write(dataString);
+
+  // End the request object
+  request.end();
+}
+
 function init() {
-   _.forEach(scrapsources.data, function (value) {
-      queue.add(function () {
-         return  scrapeListingPage(value.url);
-      }).then(function (itemToScrape) {
-         _.forEach(itemToScrape, function (value) {
-            queue.add(function () {
-               return extractPage(value.url, value.label);
-            });
-         });
+  // test scraping page
+  return extractPage(
+    "https://jalantikus.com/tips/aplikasi-tv-streaming-android/",
+    "blog",
+    function (a, b, c) {
+      console.log(a, b, c);
+    }
+  );
+
+  _.forEach(scrapsources.data, function (value) {
+    queue
+      .add(function () {
+        return scrapeListingPage(value.url);
+      })
+      .then(function (itemsToScrape) {
+        _.forEach(itemsToScrape, function (value) {
+          queue.add(function () {
+            return extractPage(value.url, value.label);
+          });
+        });
       });
+  });
 
-   });
-
-   _.forEach(scrapsources.page, function (value) {
-      queue.add(function () {
-         return extractPage(value.url, value.label);
-      });
-   });
-
+  _.forEach(scrapsources.page, function (value) {
+    queue.add(function () {
+      return extractPage(value.url, value.label);
+    });
+  });
 }
 function extractPage(url, label, callback) {
-   var thePromise = new Promise(function (resolve, reject) {
-      var onRequesting = function (error, response, _html) {
-         if (error) {
-            var errMsg = '*** error [extractPage] : ' + error;
-            console.log(errMsg);
-            reject(errMsg);
-            return;
-         }
-         _html = fn.cleanString(_html);
-         var html = _html.toString().replace('</html>', '') + '</html>';
-         var $ch = cheerio.load(html);
-         var content = {};
+  console.log("Ekstrasi halaman " + url);
+  var thePromise = new Promise(function (resolve, reject) {
+    var onRequesting = function (error, responseHTTP, _html) {
+      if (error) {
+        var errMsg = "*** error [extractPage] : " + error;
+        console.log(errMsg);
+        reject(errMsg);
+        return;
+      }
+      _html = cleanString(_html);
+      var html = _html.toString().replace("</html>", "") + "</html>";
+      var $ch = cheerio.load(html);
+      var content = {};
+      var WpApiPost = {};
 
-         //fs.writeFile("./test.html", html);
-         //return;
+      WpApiPost.title = $ch("h1.article-top-info__title").text();
+      WpApiPost.content = $ch(".article-main-content__inner").html();
+      WpApiPost.image_url =  $ch(".article-main-content__banner img").attr('src');
+      
 
-         var publishdate = (function () {
-            var tag = $ch('.property').find('.timestamp');
-            var randomHourMinute = new Date().getHours() + ':' + _.random(10, 59);
-            var pubdate = $ch(tag[0]).text();
+      console.log(WpApiPost);
+      //WpApiPost.content = WpApiPost.content.toString();
 
-            try {
-               var output = dateFormat(new Date(pubdate), "yyyy-mm-dd");
-               output = output + ' ' + randomHourMinute + ':00';
-               return output;
-            } catch (e) {
-               return dateFormat(new Date(), "yyyy-mm-dd HH:MM:ss");
-            }
+      if (!WpApiPost.title || !WpApiPost.content) {
+        return console.log("content not identified");
+      }
 
-         })();
-         var imagedir = ('jlt/') + (publishdate.toString().substr(0, 10));
-         var fulltext = (function (imagedir) {
-            var tag = $ch('.entry-content');
-            tag.contents().filter(function () {
-               return this.type === 'comment';
-            }).remove();
-            tag.find('.partner-banner-aftc-artikel-menarik').remove();
-            tag.find('.bacajuga').remove();
-            tag.find('.artikelmenarik').remove();
-            tag.find('script').remove();
-            tag.find('style').remove();
-            tag.find('.appsinner').remove();
-            tag.find('.emoji-container').remove();
-            tag.find('.partner-banner-aftc-wrapper').remove();
-            tag.find('.partner-banner-aftc-baca-juga').remove();
-            tag.find('.anchor-read').remove();
-            tag.find('.partner-inline-article-desktop').remove();
-            tag.find('.partner-inline-article-mobile').remove();
+      //content = encodeURI(WpApiPost.content);
+      console.log(WpApiPost);
 
-            var output = $ch(tag).html();
+      
+    };
 
-            var $imgtag = $ch(tag).find('img');
-            for (var i = 0; i < $imgtag.length; i++) {
-               var item = $imgtag[i];
-               var imageurl = item.attribs.src;
-               var newimgsrc = fn.downloadImage(imageurl, imagedir);
+    request.get(url, onRequesting);
 
-               output = output.replace(imageurl, newimgsrc);
-            }
-            return output;
-         })(imagedir);
-         var imageurl = (function () {
-            var output = '';
-            var tag = $ch('.content-primary .cover-image-container img');
-            if (tag.length > 0) {
-               output = tag[0].attribs.src;
-            }
-            return output;
-         })();
-
-         content.type = 'news';
-         content.title = $ch('.info h1').text();
-         content.introtext = fn.getStringBetween(html, '<meta name="description" content="', '">');
-         content.fulltext = fulltext;
-         content.created = dateFormat(new Date(), "yyyy-mm-dd HH:MM:ss");
-         content.modified = content.created;
-         content.publish_up = publishdate;
-         content.images = fn.downloadImage(imageurl, imagedir);
-         content.metakey = fn.getStringBetween(html, '<meta name="keywords" content="', '">');
-         content.metadesc = content.introtext;
-         content.alias = md5(url);
-         content.source = url;
-         content.xreference = 'jalantikus';
-         content.tagdata = (function () {
-            var output = '';
-            var tag = $ch('.property category a');
-            var temp = [];
-            for (var i = 0; i < tag.length; i++) {
-               var elm = tag[i];
-               var strtag = $ch(elm).text();
-               temp.push(strtag.replace('#', ''));
-            }
-            output = temp.join(', ');
-            return output;
-         })();
-         content.label = (function () {
-            var kanal = fn.getStringBetween(html, '<meta property="section" content="', '"/>');
-
-            if (kanal === 'teknologi') {
-               return 'tekno';
-            }
-
-            return label;
-         })();
-         content.urls = imageurl;
-
-         fn.insertContent(content, function () {
-            console.log(new Date().toLocaleString() + ' *** success [insertContent] : ' + response.request.href);
-            if (typeof callback === 'function') {
-               callback();
-            }
-         });
-         console.log(new Date().toLocaleString() + ' *** success [extractPage] : ' + response.request.href);
-         resolve(content);
-      };
-
-      fn.checkRecord(md5(url)).then(function (res) {
+    /*
+         fn.checkRecord(md5(url)).then(function (res) {
          //console.log('im here', res);
          if (res) {
-            request.get(url, onRequesting);
+         request.get(url, onRequesting);
          } else {
-            resolve('duplicate entry');
+         resolve('duplicate entry');
          }
-      }).catch(function () {
+         }).catch(function () {
          reject('error validation');
-      });
-   });
-   return thePromise;
-}
-function scrapeListingPage(url) {
-   var thePromise = new Promise(function (resolve, reject) {
-      function onRequesting(error, response, _html) {
-         if (error) {
-            //var errMessage = 'Failed to load ' + response.request.href;
-            console.log(new Date().toLocaleString() + ' *** error [scrapeListingPage] : ' + error);
-            reject(error);
-            return;
-         }
-         _html = fn.cleanString(response.body);
-         var html = _html.toString().replace('</html>', '') + '</html>';
-         var $ = cheerio.load(html);
-
-         //fs.writeFile("./test.html", html);
-         //return;
-
-         var label = (function () {
-            for (var i = 0; i < listpage.length; i++) {
-               var val = listpage[i];
-               var vurl = val.url;
-               if (vurl.indexOf(response.request.href) >= 0) {
-                  return val.label;
-               }
-            }
-            return 'berita';
-         })();
-         var tempUrl = [];
-
-         var itemToScrape = [];
-
-         //-- berita di listing search, cth : https://jalantikus.com/search/keyword/programmer
-         var items = $('.content-description .article-detail.stretch a.click-target');
-         for (var i = 0; i < items.length; i++) {
-            tempUrl.push(items[i].attribs.href);
-         }
-
-         //-- berita di listing search, cth : https://jalantikus.com/news/
-         var items = $('.content-list .article-detail a.click-target');
-         for (var i = 0; i < items.length; i++) {
-            tempUrl.push(items[i].attribs.href);
-         }
-
-         //-- filter duplikasi 
-         tempUrl = tempUrl.filter(function (elem, index, self) {
-            return index === self.indexOf(elem);
          });
-
-         //-- binding-transfrom data
-         for (var idx in tempUrl) {
-            var xurl = tempUrl[idx];
-
-            itemToScrape.push({
-               url: xurl,
-               label: label
-            });
-         }
-
-         console.log(new Date().toLocaleString() + ' *** success [scrapeListingPage] : ' + response.request.href);
-         resolve(itemToScrape);
-      }
-      request(url, onRequesting);
-   });
-
-   return thePromise;
+         * 
+         */
+  });
+  return thePromise;
 }
 
-module.exports = {doProcess: init, scrapeListingPage};
+function scrapeListingPage(url) {
+  //console.log('mulai ekstrak daftar Page di ' + url);
+  var thePromise = new Promise(function (resolve, reject) {
+    function onRequesting(error, response, _html) {
+      if (error) {
+        //var errMessage = 'Failed to load ' + response.request.href;
+        console.log(
+          new Date().toLocaleString() +
+            " *** error [scrapeListingPage] : " +
+            error
+        );
+        reject(error);
+        return;
+      }
+      _html = cleanString(response.body);
+      var html = _html.toString().replace("</html>", "") + "</html>";
+      var $ = cheerio.load(html);
 
+      try {
+        var namafile =
+          "listing_page-" +
+          url.toString().replace(/[:/.\n\t\r]/g, "_") +
+          ".html";
+        fs.writeFileSync("./webpages/" + namafile, html);
+        // file written successfully
+      } catch (err) {
+        console.error(err);
+      }
+
+      var label = (function () {
+        for (var i = 0; i < listpage.length; i++) {
+          var val = listpage[i];
+          var vurl = val.url;
+          if (vurl.indexOf(response.request.href) >= 0) {
+            return val.label;
+          }
+        }
+        return "berita";
+      })();
+      var tempUrl = [];
+
+      var itemsToScrape = [];
+
+      //-- berita di slideshow
+      var items = $(".article-asset a");
+      for (var i = 0; i < items.length; i++) {
+        tempUrl.push(items[i].attribs.href);
+      }
+
+      //-- filter duplikasi
+      tempUrl = tempUrl.filter(function (elem, index, self) {
+        return index === self.indexOf(elem);
+      });
+
+      //-- binding-transfrom data
+      for (var idx in tempUrl) {
+        var xurl = tempUrl[idx];
+        if (xurl.indexOf("merdeka.com") < 0) {
+          xurl = "http://www.merdeka.com" + xurl;
+        }
+
+        if (xurl.indexOf("/foto/") >= 0) {
+          continue;
+        }
+
+        itemsToScrape.push({
+          url: xurl,
+          label: label,
+        });
+      }
+      console.log(
+        new Date().toLocaleString() +
+          " *** success [scrapeListingPage] : terdapat " +
+          itemsToScrape.length +
+          " konten untuk di ekstrak pada " +
+          response.request.href
+      );
+      resolve(itemsToScrape);
+    }
+    request(url, onRequesting);
+  });
+  return thePromise;
+}
+
+module.exports = {
+  doProcess: init,
+  scrapeListingPage,
+};
