@@ -1,6 +1,6 @@
 var config = {};
-config.endpointserver = "http://localhost:8080/wp-scraping/wp-insert-post.php";
-//config.endpointserver = "http://aligea.icu/wp-scraping/wp-insert-post.php";
+//config.endpointserver = "http://localhost:8080/wp-scraping/wp-insert-post.php";
+config.endpointserver = "http://aligea.icu/wp-scraping/wp-insert-post.php";
 config.list_of_main_page_to_scrape = [
   {
     baseurl: "https://www.waspada.id",
