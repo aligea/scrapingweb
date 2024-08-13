@@ -1,162 +1,177 @@
-var express = require('express');
-//var fs = require('fs');
-//var request = require('request');
-//var cheerio = require('cheerio');
-var http = require('http');
-
-var app = express();
-var server = http.createServer(app);
-
-const low = require('lowdb');
-const FileSync = require('lowdb/adapters/FileSync');
-
-var config = require('./config.js');
-var _ = require('lodash');
-//var PQueue = require('p-queue');
-//var queue = new PQueue({concurrency: 1});
-var queue = (function () {
-   var self = {};
-   var idx = 0;
-   var timer;
-
-   self.data = [];
-   self.listener = [];
-   self.add = function (fn) {
+const express = require("express");
+const fs = require("fs");
+const request = require("request");
+const http = require("http");
+const cheerio = require("cheerio");
+const low = require("lowdb");
+const FileSync = require("lowdb/adapters/FileSync");
+const _ = require("lodash");
+const globalFunction = require("./src/global-functions.js");
+const { cleanString, downloadImage } = globalFunction;
+const config = require("./config.js");
+const app = express();
+const server = http.createServer(app);
+const queue = (function () {
+  let idx = 0;
+  const self = {
+    data: [],
+    listener: [],
+    add(fn) {
       idx++;
-      var obj = {id: idx, processing: fn};
+      const obj = { id: idx, processing: fn };
       self.data.push(obj);
-      var res = {
-         then: function (what) {
-            //console.log(what);
-            if (typeof what === 'function') {
-               //obj.listener.push(what);
-            }
-            //console.log(what);
-            obj.callback = what;
-            //return what;
-         }
+      const res = {
+        then(callback) {
+          if (typeof callback === "function") {
+            obj.callback = callback;
+          }
+        },
       };
-      //obj.listener = [];
-      obj.callback = null;
       obj.success = function (data) {
-         if (typeof obj.callback === 'function') {
-            //obj.callback(what);
-            //console.log(obj.callback);
-            //console.log(obj.callback);
-            obj.callback(data);
-
-         }
-         // console.log(obj.callback);
-         //console.log(obj.listener);
-         //console.log(typeof what);
-
-         self.done(obj);
+        if (typeof obj.callback === "function") {
+          obj.callback(data);
+        }
+        self.done(obj);
       };
       obj.error = function () {
-         self.done(obj);
-         console.log('do-error pid: ' + obj.id);
-         //self.done(obj);
+        self.done(obj);
       };
-
       obj.processing().then(obj.success).catch(obj.error);
-
-      if (self.data.length === 1) {
-         //run();
-      }
       return res;
-      //console.log(fn);
-   };
-   self.delete = function () {};
-   self.done = function (obj) {
-      for (var i = 0; i < self.data.length; i++) {
-         if (self.data[i].id === obj.id) {
-            self.data.splice(i, 1);
-            break;
-         }
-      }
-
+    },
+    done(obj) {
+      self.data = self.data.filter((item) => item.id !== obj.id);
       if (self.data.length === 0) {
-         idx = 0;
-         console.info('empty queue');
-         self.listener.map(function (fn) {
-            if (typeof fn === 'function') {
-               fn();
-            }
-         });
+        idx = 0;
+        self.listener.forEach((fn) => {
+          if (typeof fn === "function") fn();
+        });
       }
-      timer = setTimeout(function () {
-         if (self.data.length === 0) {
-            return;
-         }
-         self.done(self.data[0]);
-      }, 60000);
-      //console.info(self.data.length);
-      //console.log('process pending ' + self.data.length);
-   };
-   self.addListener = function (fn) {
-      if (typeof fn === 'function') {
-         self.listener.push(fn);
-      }
-   };
-
-   function run() {
-      if (self.data.length > 0) {
-         var obj = self.data[0];
-         console.info('=== processing-id: ' + obj.id);
-         var res = obj.processing();
-
-         res.then(function (data) {
-            console.info('=== sukses-id: ' + obj.id);
-            obj.success(data);
-            setImmediate(run);
-         });
-         res.catch(function (e) {
-            console.info('=== gagal-id: ' + obj.id);
-            obj.error(e);
-            setImmediate(run);
-         });
-      } else {
-         setImmediate(run);
-      }
-   }
-
-   self.run = run;
-   return self;
+    },
+    addListener(fn) {
+      if (typeof fn === "function") self.listener.push(fn);
+    },
+  };
+  return self;
 })();
 global.queue = queue;
 
-function onServerReady() {
-   /*
-    _.forEach(config.source_url, function (value, key) {
-      let srcfile = './src/' + key;
-      if (!value.data) {
-         return;
-      }
-      //console.log('--initialize ' + srcfile);
-      var mod = require(srcfile);
-
-      mod.doProcess();
-      //console.log(mod);
-   });
-    */
-   var targetWebsite = require('./src/jalantikus.js');
-   targetWebsite.doProcess();
-   //console.log(config.source_url.merdeka);
+function sendToWpEndpoint(postData) {
+  const clientServerOptions = {
+    uri: config.endpointserver,
+    form: postData,
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  };
+  request(clientServerOptions).on("error", function (err) {
+    console.error("cannot connect to " + clientServerOptions.uri);
+  });
 }
 
-server.listen('8080', function () {
-   console.info(new Date().toLocaleString() + ' Server is listening on port %d', server.address().port);
-   onServerReady();
-   queue.addListener(function () {
-      setTimeout(function () {
-         console.info(new Date().toLocaleString() +  '===== start again =====');
-         onServerReady();
-      }, 1 * (60000));
-   });
-   //console.log = function(){};
+function extractPage(pageToScrape) {
+  return new Promise((resolve, reject) => {
+    request.get(pageToScrape.url, (error, response, _html) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      const html = cleanString(_html).replace("</html>", "") + "</html>";
+      const $ch = cheerio.load(html);
+      const WpApiPost = {
+        post_title: $ch(pageToScrape.title_attr).text(),
+        post_content: $ch(pageToScrape.content_attr).html(),
+        image_url: $ch(pageToScrape.image_attr).attr("src"),
+        post_category: pageToScrape.label,
+      };
+
+      if (
+        WpApiPost.post_title &&
+        WpApiPost.post_content &&
+        WpApiPost.image_url
+      ) {
+        sendToWpEndpoint(WpApiPost);
+        resolve(WpApiPost);
+      } else {
+        reject("Error extracting page content");
+      }
+    });
+  });
+}
+
+function scrapeListingPage(pageToScrape) {
+  return new Promise((resolve, reject) => {
+    request(pageToScrape.url, (error, response, _html) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      const html =
+        cleanString(response.body).replace("</html>", "") + "</html>";
+      const $ = cheerio.load(html);
+      const listofHrefURL = $(pageToScrape.list_href_attr)
+        .map((_, el) => $(el).attr("href"))
+        .get();
+      const listofSinglePageItem = _.uniq(listofHrefURL).map((href) => ({
+        url: pageToScrape.baseurl + href.replace(pageToScrape.baseurl, ""),
+        content_attr: pageToScrape.content_attr,
+        image_attr: pageToScrape.image_attr,
+        label: pageToScrape.label,
+        title_attr: pageToScrape.title_attr,
+      }));
+
+      if (listofSinglePageItem.length > 0) {
+        resolve(listofSinglePageItem);
+      } else {
+        reject("No URLs found to scrape");
+      }
+    });
+  });
+}
+
+function onServerReady() {
+  /**
+   * ambil data array di config
+   */
+  for (i = 0; i < config.list_of_main_page_to_scrape.length; i++) {
+    var mainpagetobescrape = config.list_of_main_page_to_scrape[i];
+    var listener = scrapeListingPage(mainpagetobescrape).then(
+      (listofSinglePageItem) => {
+        listofSinglePageItem.forEach((item) =>
+          queue.add(() => extractPage(item))
+        );
+      }
+    );
+    queue.addListener(listener);
+  }
+
+  for (i = 0; i < config.list_of_sigle_page_to_scrape.length; i++) {
+    var objtoscrape = config.list_of_sigle_page_to_scrape[i];
+    var listener2 = extractPage(objtoscrape);
+    queue.addListener(listener2);
+  }
+}
+
+app.get("/", function (req, res) {
+ // res.send("<h1>Hello the sadness world!</h1>");
+  res.send(" Server is listening on port " + server.address().port);
 });
-process.on('unhandledRejection', (reason, p) => {
-   console.log('Unhandled Rejection at: Promise', p, 'reason:', reason);
-   // application specific logging, throwing an error, or other logic here
+
+server.listen("3000", function () {
+  console.info(
+    new Date().toLocaleString() + " Server is listening on port %d",
+    server.address().port
+  );
+  onServerReady();
+  queue.addListener(function () {
+    setTimeout(() => {
+      console.info(new Date().toLocaleString() + "===== start again =====");
+      onServerReady();
+    }, 60000);
+  });
 });
+
+process.on("unhandledRejection", (reason, p) => {
+  console.error("Unhandled Rejection at: Promise", p, "reason:", reason);
+});
+
 module.exports = app;
