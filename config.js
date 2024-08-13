@@ -1,6 +1,6 @@
 var config = {};
-//config.endpointserver = "http://localhost:8080/wp-scraping/wp-insert-post.php";
-config.endpointserver = "http://aligea.icu/wp-scraping/wp-insert-post.php";
+config.endpointserver = "http://localhost:8080/wp-scraping/wp-insert-post.php";
+//config.endpointserver = "http://aligea.icu/wp-scraping/wp-insert-post.php";
 config.list_of_main_page_to_scrape = [
   {
     baseurl: "https://www.waspada.id",
@@ -29,8 +29,24 @@ config.list_of_sigle_page_to_scrape = [
     title_attr: "h1.entry-title",
     image_attr: ".post-thumbnail img",
     content_attr: ".entry-content-single",
-  }
+  },
 ];
+
+/**
+ * scraping 108 listing page scorpionmonitor.org
+ */
+for (i = 1; i <= 108; i++) {
+  var obj1 = {
+    baseurl: "http://www.scorpionmonitor.org",
+    url: "http://scorpionmonitor.org/newslist?page=" + i,
+    label: "news",
+    list_href_attr: ".posting-content a",
+    title_attr: "h1.entry-title",
+    image_attr: ".post-thumbnail img",
+    content_attr: ".entry-content-single",
+  };
+  config.list_of_main_page_to_scrape.push(obj1);
+}
 
 config.source_url = {
   analisadaily: [],
@@ -73,5 +89,5 @@ config.mysql_info = {
   password: "terserahsaja",
   database: "db_grabbing",
 };
-
+console.log(config.list_of_main_page_to_scrape);
 module.exports = config;

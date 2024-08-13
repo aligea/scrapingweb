@@ -63,7 +63,7 @@ function sendToWpEndpoint(postData) {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
   };
-  request(clientServerOptions).on("error", function (err) {
+  return request(clientServerOptions).on("error", function (err) {
     console.error("cannot connect to " + clientServerOptions.uri);
   });
 }
@@ -89,7 +89,7 @@ function extractPage(pageToScrape) {
         WpApiPost.post_content &&
         WpApiPost.image_url
       ) {
-        sendToWpEndpoint(WpApiPost);
+        queue.addListener(sendToWpEndpoint(WpApiPost));
         resolve(WpApiPost);
       } else {
         reject("Error extracting page content");
@@ -152,7 +152,7 @@ function onServerReady() {
 }
 
 app.get("/", function (req, res) {
- // res.send("<h1>Hello the sadness world!</h1>");
+  // res.send("<h1>Hello the sadness world!</h1>");
   res.send(" Server is listening on port " + server.address().port);
 });
 
@@ -161,7 +161,7 @@ server.listen("3000", function () {
     new Date().toLocaleString() + " Server is listening on port %d",
     server.address().port
   );
-  onServerReady();
+  //onServerReady();
   queue.addListener(function () {
     setTimeout(() => {
       console.info(new Date().toLocaleString() + "===== start again =====");
