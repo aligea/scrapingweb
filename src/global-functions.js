@@ -7,7 +7,7 @@ var fs = require('fs');
 var md5 = require('md5');
 var dateFormat = require('dateformat');
 var mysql = require('mysql');
-var pool = mysql.createPool(config.mysql_info);
+//var pool = mysql.createPool(config.mysql_info);
 
 var fn = {
    validateRecord: validateRecord,

@@ -63,8 +63,11 @@ function sendToWpEndpoint(postData) {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
   };
+  
   return request(clientServerOptions).on("error", function (err) {
     console.error("cannot connect to " + clientServerOptions.uri);
+  }).on('complete', function(){
+    //console.log(postData.post_title);
   });
 }
 
@@ -83,6 +86,11 @@ function extractPage(pageToScrape) {
         image_url: $ch(pageToScrape.image_attr).attr("src"),
         post_category: pageToScrape.label,
       };
+
+      /**
+       * fix bug bentuk url rusak, contoh : http://www.scorpionmonitor.org/images/Pak Boy 2020/saat-penangkapan-ular-di-sei-serdang_00.jpg
+       */
+      WpApiPost.image_url = encodeURI(WpApiPost.image_url);
 
       if (
         WpApiPost.post_title &&
@@ -122,7 +130,7 @@ function scrapeListingPage(pageToScrape) {
       if (listofSinglePageItem.length > 0) {
         resolve(listofSinglePageItem);
       } else {
-        reject("No URLs found to scrape");
+        reject("No URLs found to scrape at " + pageToScrape.url);
       }
     });
   });
@@ -141,7 +149,9 @@ function onServerReady() {
         );
       }
     );
-    queue.addListener(listener);
+    queue.add(function () {
+      return listener;
+    });
   }
 
   for (i = 0; i < config.list_of_sigle_page_to_scrape.length; i++) {
@@ -161,7 +171,9 @@ server.listen("3000", function () {
     new Date().toLocaleString() + " Server is listening on port %d",
     server.address().port
   );
-  //onServerReady();
+
+  onServerReady();
+
   queue.addListener(function () {
     setTimeout(() => {
       console.info(new Date().toLocaleString() + "===== start again =====");

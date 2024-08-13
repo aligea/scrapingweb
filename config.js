@@ -38,56 +38,27 @@ config.list_of_sigle_page_to_scrape = [
 for (i = 1; i <= 108; i++) {
   var obj1 = {
     baseurl: "http://www.scorpionmonitor.org",
-    url: "http://scorpionmonitor.org/newslist?page=" + i,
+    url: "http://www.scorpionmonitor.org/newslist?page=" + i,
     label: "news",
     list_href_attr: ".posting-content a",
-    title_attr: "h1.entry-title",
-    image_attr: ".post-thumbnail img",
-    content_attr: ".entry-content-single",
+    title_attr: "div.page-header",
+    image_attr: "img.img-responsive.img-thumbnail",
+    content_attr: "div#content-news",
   };
   config.list_of_main_page_to_scrape.push(obj1);
 }
 
-config.source_url = {
-  analisadaily: [],
-  liputan6: {
-    data: [
-      { label: "tekno", url: "http://tekno.liputan6.com/" },
-      { label: "berita", url: "http://news.liputan6.com/" },
-    ],
-    page: [],
-  },
-  merdeka: {
-    data: [{ label: "tekno", url: "https://www.merdeka.com/teknologi/" }],
-    page: [],
-  },
-  tribunmedan: {
-    data: [{ label: "berita", url: "http://medan.tribunnews.com/" }],
-    page: [],
-  },
-  jalantikus: {
-    data: [
-      {
-        url: "https://jalantikus.com/all/article/order/published/page/1/",
-        label: "tekno",
-      },
-      { url: "https://jalantikus.com/tips/", label: "tekno" },
-    ],
-    page: [
-      {
-        url: "https://jalantikus.com/gokil/programmer-termuda-di-dunia/",
-        label: "tekno",
-      },
-    ],
-  },
+
+const shuffle = (array) => { 
+  for (let i = array.length - 1; i > 0; i--) { 
+    const j = Math.floor(Math.random() * (i + 1)); 
+    [array[i], array[j]] = [array[j], array[i]]; 
+  } 
+  return array; 
 };
 
-config.mysql_info = {
-  connectionLimit: 10,
-  host: "localhost",
-  user: "root",
-  password: "terserahsaja",
-  database: "db_grabbing",
-};
-console.log(config.list_of_main_page_to_scrape);
+var list_of_main_page_to_scrape = config.list_of_main_page_to_scrape;
+const shuffledArray = shuffle(list_of_main_page_to_scrape); 
+config.list_of_main_page_to_scrape = shuffledArray;
+
 module.exports = config;
