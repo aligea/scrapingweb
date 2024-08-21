@@ -3,8 +3,13 @@
     "version": "1.0.0",
     "description": "untuk scraping web sesuai yang di inginkan",
     "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified \" && exit",
+        "start": "node app.js"
+    },
     "dependencies": {
         "async": "^2.5.0",
+        "axios": "^1.7.4",
         "cheerio": "latest",
         "dateformat": "^3.0.2",
         "express": "latest",
@@ -26,8 +31,5 @@
         "web"
     ],
     "author": "Bandit Coding",
-    "license": "ISC",
-    "scripts": {
-        "start": "node app.js"
-    }
+    "license": "ISC"
 }
